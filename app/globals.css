@@ -343,6 +343,10 @@ h1, h2, h3, h4, h5, h6 {
   .delay-400  { animation-delay: 400ms; }
 
   .text-balance { text-wrap: balance; }
+  .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  .shadow-glow   { box-shadow: var(--shadow-glow); }
+  .shadow-glow-v { box-shadow: var(--shadow-glow-v); }
 
   /* Noise texture overlay */
   .noise::after {

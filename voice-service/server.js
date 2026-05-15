@@ -20,10 +20,17 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 // System Prompt for our regenerative medicine concierge
 const SYSTEM_PROMPT = `
 You are the AI Concierge for PracticeOS Regenerative Medicine Clinic.
-Your voice is warm, direct, and highly professional.
-Speak in short, punchy sentences. Never give medical advice.
-Always be empathetic to the caller's symptoms (like fatigue or joint pain).
-Your goal is to collect their details and prepare them for a $250 deposit to book an Initial Consult.
+Your voice is warm, empathetic, and highly professional.
+Speak in short, conversational sentences. Never give medical advice.
+
+Your primary goal is to perform a highly empathetic patient intake before attempting to book them or ask for money. 
+Follow this exact conversational flow:
+1. Greet the caller and warmly ask what they are currently struggling with regarding their health.
+2. Listen carefully to their symptoms. Express genuine empathy and validation (e.g., "I am so sorry you've been dealing with that, but you've called the right place.").
+3. Ask 1 or 2 specific follow-up questions to understand the severity or duration of their symptoms (e.g., "How long has the fatigue been affecting your daily life?").
+4. Reassure them that Dr. Castillo specializes in exactly these types of complex regenerative cases.
+5. Only AFTER you have made them feel completely understood, explain that the next step is an Initial Consult to build a custom regenerative protocol. 
+6. Explain that the Initial Consult requires a $250 deposit to secure the calendar slot, and ask if they are ready to book.
 `;
 
 // Define the Function Calling "Tools" for Gemini
@@ -201,41 +208,36 @@ app.ws('/stream', (twilioWs, req) => {
                             twilioWs.send(JSON.stringify(mediaMessage));
                         }
                     }
+                }
+            }
 
-                    // 2. Function Call Handling (The Concierge requested data or action!)
-                    if (part.functionCall) {
-                        const { name, args } = part.functionCall;
-                        console.log(`\n[Gemini Tool Called] -> ${name}`);
-                        console.log(`Arguments Provided:`, args);
+            // 2. Function Call Handling (The Concierge requested data or action!)
+            if (response.toolCall) {
+                for (const call of response.toolCall.functionCalls) {
+                    const { id, name, args } = call;
+                    console.log(`\n[Gemini Tool Called] -> ${name}`);
+                    console.log(`Arguments Provided:`, args);
 
-                        // STUB: Connect to PracticeOS postgres / scheduling / Stripe here.
-                        // We must send a "functionResponse" back so Gemini can formulate its audio reply.
-                        let simulatedResult = {};
-                        if (name === "check_calendar") {
-                            simulatedResult = { status: "Success", slots_available: ["2:00 PM Tuesday", "9:00 AM Wed"], visit_total_price: 500, deposit_due: 250 };
-                        } else if (name === "save_intake_notes") {
-                            simulatedResult = { status: "Profile Created", patient_id: "PT-777" };
-                        } else if (name === "process_stripe_payment") {
-                            simulatedResult = { status: "Payment Successful", receipt_id: "ch_xyz987" };
-                        }
-
-                        // Send the result explicitly back to the model websocket
-                        const functionResponsePayload = {
-                            clientContent: {
-                                turns: [{
-                                    role: "user",
-                                    parts: [{
-                                        functionResponse: {
-                                            name: name,
-                                            response: simulatedResult
-                                        }
-                                    }]
-                                }],
-                                turnComplete: true
-                            }
-                        };
-                        geminiWs.send(JSON.stringify(functionResponsePayload));
+                    let simulatedResult = {};
+                    if (name === "check_calendar") {
+                        simulatedResult = { status: "Success", slots_available: ["2:00 PM Tuesday", "9:00 AM Wed"], visit_total_price: 500, deposit_due: 250 };
+                    } else if (name === "save_intake_notes") {
+                        simulatedResult = { status: "Profile Created", patient_id: "PT-777" };
+                    } else if (name === "process_stripe_payment") {
+                        simulatedResult = { status: "Payment Successful", receipt_id: "ch_xyz987" };
                     }
+
+                    // Send the result explicitly back to the model websocket
+                    const functionResponsePayload = {
+                        toolResponse: {
+                            functionResponses: [{
+                                id: id,
+                                name: name,
+                                response: { result: simulatedResult }
+                            }]
+                        }
+                    };
+                    geminiWs.send(JSON.stringify(functionResponsePayload));
                 }
             }
         });

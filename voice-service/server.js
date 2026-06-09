@@ -116,7 +116,7 @@ app.ws('/stream', (twilioWs, req) => {
     // 3. Connect to Gemini Multimodal Live API
     const setupGeminiConnection = () => {
         const HOST = "generativelanguage.googleapis.com";
-        const MODEL = "models/gemini-2.5-flash-native-audio-latest"; // Updated to latest Live API model
+        const MODEL = "models/gemini-2.5-flash-native-audio-latest";
         const URL = `wss://${HOST}/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
         
         geminiWs = new WebSocket(URL);
@@ -145,18 +145,24 @@ app.ws('/stream', (twilioWs, req) => {
             geminiWs.send(JSON.stringify(setupMessage));
 
             // Force Gemini to speak first by sending an initial prompt
-            const initialGreeting = {
-                clientContent: {
-                    turns: [{
-                        role: "user",
-                        parts: [{ 
-                            text: "The call has just connected. Please warmly greet the caller as the front desk concierge of PracticeOS Regenerative Medicine Clinic, and ask how you can help them today." 
-                        }]
-                    }],
-                    turnComplete: true
+            // We use a 1.5s delay to ensure the Twilio WebRTC audio bridge is fully open 
+            // so the patient doesn't miss the first word of the greeting.
+            setTimeout(() => {
+                const initialGreeting = {
+                    clientContent: {
+                        turns: [{
+                            role: "user",
+                            parts: [{ 
+                                text: "The call has just connected. Please warmly greet the caller as the front desk concierge of PracticeOS Regenerative Medicine Clinic, and ask how you can help them today." 
+                            }]
+                        }],
+                        turnComplete: true
+                    }
+                };
+                if (geminiWs.readyState === WebSocket.OPEN) {
+                    geminiWs.send(JSON.stringify(initialGreeting));
                 }
-            };
-            geminiWs.send(JSON.stringify(initialGreeting));
+            }, 1500);
         });
 
         geminiWs.on('message', (data) => {
@@ -243,7 +249,11 @@ app.ws('/stream', (twilioWs, req) => {
         });
 
         geminiWs.on('close', (code, reason) => {
-            console.log(`[Gemini] Connection closed. Code: ${code}, Reason: ${reason}`);
+            const msg = reason?.toString() || '(no reason)';
+            console.log(`[Gemini] Connection closed. Code: ${code}, Reason: ${msg}`);
+            if (code !== 1000) {
+                console.error(`[Gemini] UNEXPECTED CLOSE — code ${code}: ${msg}`);
+            }
         });
         
         geminiWs.on('error', (err) => {
@@ -304,7 +314,44 @@ app.ws('/stream', (twilioWs, req) => {
     });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`🚀 PracticeOS Voice Microservice running on port ${PORT}`);
     console.log(`Ensure your Twilio URL points to POST /incoming-call and WS /stream`);
+
+    // ── Gemini Live API health check ────────────────────────────────────────────
+    // Tests an actual WebSocket connection to the Live API (more reliable than
+    // querying the models list, which sometimes lags behind real availability).
+    try {
+        await new Promise((resolve, reject) => {
+            const testWs = new WebSocket(
+                `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`
+            );
+            const timeout = setTimeout(() => { testWs.terminate(); reject(new Error('timeout')); }, 8000);
+            testWs.on('open', () => {
+                testWs.send(JSON.stringify({
+                    setup: { model: 'models/gemini-2.5-flash-native-audio-latest', generationConfig: { responseModalities: ['AUDIO'] } }
+                }));
+            });
+            testWs.on('message', (data) => {
+                const msg = JSON.parse(data.toString());
+                if (msg.setupComplete !== undefined) {
+                    clearTimeout(timeout);
+                    testWs.close();
+                    resolve();
+                }
+            });
+            testWs.on('error', (e) => { clearTimeout(timeout); reject(e); });
+            testWs.on('close', (code, reason) => {
+                if (code !== 1000 && code !== 1001) {
+                    clearTimeout(timeout);
+                    reject(new Error(`WS closed ${code}: ${reason}`));
+                }
+            });
+        });
+        console.log('✅ Gemini Live API OK — model ready, WebSocket confirmed');
+    } catch (e) {
+        console.error('⚠️  WARNING: Gemini Live API health check failed:', e.message);
+        console.error('   Calls may fail. Check API key/quota at aistudio.google.com');
+    }
+
 });

@@ -6,15 +6,17 @@ import { useState } from 'react';
 import {
   Sparkles, LayoutDashboard, MessageSquare, Mic, Bell, DollarSign,
   Target, Star, BarChart3, Brain, Settings, LogOut, ChevronRight,
-  Menu, X, Building2, Users,
+  Menu, X, Building2, Users, PhoneCall,
 } from 'lucide-react';
 
 const NAV_SECTIONS = [
   {
     label: 'OVERVIEW',
     items: [
-      { icon: LayoutDashboard, label: 'Dashboard',    href: '/dashboard' },
-      { icon: BarChart3,       label: 'Analytics',    href: '/dashboard/analytics' },
+      { icon: LayoutDashboard, label: 'Dashboard',       href: '/dashboard' },
+      { icon: BarChart3,       label: 'Analytics',       href: '/dashboard/analytics' },
+      { icon: PhoneCall,       label: 'AI Concierge ROI', href: '/dashboard/roi' },
+      { icon: Target,          label: 'UA Squad', href: '/dashboard/longevity' },
     ],
   },
   {

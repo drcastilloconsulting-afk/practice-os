@@ -12,6 +12,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@ngrok/ngrok": "^1.7.0",
     "alawmulaw": "^6.0.0",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",

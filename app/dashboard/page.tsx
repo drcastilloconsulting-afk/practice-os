@@ -5,7 +5,7 @@ import {
   TrendingUp, TrendingDown, DollarSign, Users, Calendar, Bell,
   Mic, MessageSquare, Target, Star, BarChart3, Brain,
   ArrowUpRight, Clock, AlertTriangle, CheckCircle2, Activity,
-  ChevronRight, Zap,
+  ChevronRight, Zap, PhoneCall,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -46,6 +46,15 @@ const KPIs = [
     icon: Users,
     sub: 'this month',
     color: 'from-amber-500 to-orange-600',
+  },
+  {
+    label: 'AI Concierge Revenue',
+    value: '$15,750',
+    change: '+31%',
+    positive: true,
+    icon: PhoneCall,
+    sub: '63 deposits this month',
+    color: 'from-emerald-500 to-teal-600',
   },
 ];
 
@@ -112,7 +121,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {KPIs.map((kpi, i) => (
           <motion.div
             key={kpi.label}
@@ -272,6 +281,38 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
+      </motion.div>
+
+      {/* ── AI Concierge ROI Teaser ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.55 }}
+        className="glass-card p-5 grid sm:grid-cols-4 gap-4 items-center"
+        style={{ borderColor: 'rgba(16,185,129,0.2)' }}
+      >
+        <div className="sm:col-span-1 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0">
+            <PhoneCall className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="font-display font-bold text-sm">AI Concierge</p>
+            <span className="badge badge-green text-[10px]">Live</span>
+          </div>
+        </div>
+        {[
+          { label: 'Calls This Month', value: '89' },
+          { label: 'Deposits Collected', value: '$15,750' },
+          { label: 'Staff Hours Saved', value: '74 hrs' },
+        ].map(stat => (
+          <div key={stat.label} className="text-center">
+            <p className="font-display font-bold text-2xl text-[#F1F5F9]">{stat.value}</p>
+            <p className="text-[11px] text-[#64748B]">{stat.label}</p>
+          </div>
+        ))}
+        <Link href="/dashboard/roi" className="btn-primary text-sm justify-center sm:col-span-1">
+          Full ROI Report <ArrowUpRight className="w-4 h-4" />
+        </Link>
       </motion.div>
 
       {/* ── Quick action banner ── */}

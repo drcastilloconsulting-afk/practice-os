@@ -1,0 +1,114 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Clinic {
+  id              String   @id
+  name            String
+  ownerNpi        String?  @unique @map("owner_npi")
+  stripeAccountId String?  @unique @map("stripe_account_id")
+  contactEmail    String   @map("contact_email")
+  referralCode    String   @unique @map("referral_code")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  subscribers Subscriber[]
+  payouts     ClinicPayout[]
+
+  @@map("clinics")
+}
+
+model Subscriber {
+  id                   String   @id
+  email                String   @unique
+  firstName            String   @map("first_name")
+  lastName             String   @map("last_name")
+  birthDate            DateTime @map("birth_date")
+  gender               String
+  cohortId             String   @map("cohort_id")
+  referredByClinicId   String?  @map("referred_by_clinic_id")
+  stripeSubscriptionId String?  @unique @map("stripe_subscription_id")
+  status               String   @default("active")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  clinic             Clinic?              @relation(fields: [referredByClinicId], references: [id])
+  wearableLogs       WearableLog[]
+  userHabits         UserHabit[]
+  leaderboardHistory LeaderboardHistory[]
+  payouts            ClinicPayout[]
+
+  @@map("subscribers")
+}
+
+model WearableLog {
+  id                     BigInt   @id @default(autoincrement())
+  subscriberId           String   @map("subscriber_id")
+  deviceProvider         String   @map("device_provider")
+  syncTimestamp          DateTime @map("sync_timestamp")
+  sleepDurationSeconds   Int?     @map("sleep_duration_seconds")
+  sleepEfficiencyPct     Float?   @map("sleep_efficiency_pct")
+  heartRateVariabilityMs Float?   @map("heart_rate_variability_ms")
+  restingHeartRateBpm    Float?   @map("resting_heart_rate_bpm")
+  dailyStepCount         Int?     @map("daily_step_count")
+  activeCaloriesBurned   Int?     @map("active_calories_burned")
+  rawPayload             Json?    @map("raw_payload")
+
+  subscriber Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  @@index([subscriberId])
+  @@index([syncTimestamp])
+  @@map("wearable_logs")
+}
+
+model UserHabit {
+  id                 String   @id
+  subscriberId       String   @map("subscriber_id")
+  habitName          String   @map("habit_name")
+  description        String?
+  targetMetric       String?  @map("target_metric")
+  mitigationStrategy String?  @map("mitigation_strategy")
+  isSelfReported     Boolean  @default(false) @map("is_self_reported")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  subscriber Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  @@map("user_habits")
+}
+
+model LeaderboardHistory {
+  id                         BigInt   @id @default(autoincrement())
+  subscriberId               String   @map("subscriber_id")
+  cohortId                   String   @map("cohort_id")
+  weekStartDate              DateTime @map("week_start_date")
+  individualPerformanceScore Float?   @map("individual_performance_score")
+  cohortMedianIps            Float?   @map("cohort_median_ips")
+  cohortNormalizationIndex   Float?   @map("cohort_normalization_index")
+  cohortRank                 Int      @map("cohort_rank")
+  createdAt                  DateTime @default(now()) @map("created_at")
+
+  subscriber Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  @@unique([weekStartDate, subscriberId])
+  @@map("leaderboard_history")
+}
+
+model ClinicPayout {
+  id                          String    @id
+  partnerId                   String    @map("partner_id")
+  winnerSubscriberId          String    @map("winner_subscriber_id")
+  payoutAmountCents           Int       @default(1000000) @map("payout_amount_cents")
+  status                      String    @default("pending")
+  servicesRenderedDescription String?   @map("services_rendered_description")
+  stripeTransferId            String?   @map("stripe_transfer_id")
+  createdAt                   DateTime  @default(now()) @map("created_at")
+  processedAt                 DateTime? @map("processed_at")
+
+  clinic     Clinic     @relation(fields: [partnerId], references: [id])
+  subscriber Subscriber @relation(fields: [winnerSubscriberId], references: [id])
+
+  @@map("clinic_payouts")
+}

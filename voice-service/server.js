@@ -265,7 +265,13 @@ app.ws('/stream', (twilioWs, req) => {
 
     // 4. Handle incoming messages from Twilio
     twilioWs.on('message', (message) => {
-        const msg = JSON.parse(message);
+        let msg;
+        try {
+            msg = JSON.parse(message);
+        } catch (e) {
+            console.error('[Twilio] Error parsing message JSON:', e);
+            return;
+        }
 
         if (msg.event === 'start') {
             streamSid = msg.start.streamSid;
@@ -306,6 +312,11 @@ app.ws('/stream', (twilioWs, req) => {
             console.log(`[Twilio] Stream Stopped`);
             if (geminiWs) geminiWs.close();
         }
+    });
+
+    twilioWs.on('error', (err) => {
+        console.error('[Twilio] WebSocket error occurred:', err);
+        if (geminiWs) geminiWs.close();
     });
 
     twilioWs.on('close', () => {

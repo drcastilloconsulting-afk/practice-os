@@ -91,7 +91,7 @@ export async function generateFollowUpMessage({
     const client = createAnthropicClient();
 
     const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 1024,
         system: `You are Dr. Castillo's follow-up care assistant. Generate personalized, warm follow-up messages for patients.
 
@@ -143,7 +143,7 @@ export async function analyzeFollowUpResponse({
     const client = createAnthropicClient();
 
     const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 2048,
         system: `You are a clinical follow-up analyst. Analyze a patient's response to a follow-up check and determine:
 1. Whether the patient is progressing as expected

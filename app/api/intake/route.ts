@@ -35,7 +35,7 @@ ${patientName ? `Patient name: ${patientName}` : 'Unknown patient — gather the
   - Key Notes for Provider: [bullet points]`;
 
   const stream = client.messages.stream({
-    model: 'claude-opus-4-5',
+    model: 'claude-3-5-sonnet-20241022',
     max_tokens: 1024,
     system,
     messages: messages.map((m: { role: string; content: string }) => ({

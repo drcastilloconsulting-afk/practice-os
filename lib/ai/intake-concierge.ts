@@ -165,7 +165,7 @@ export async function streamIntakeConversation({
     }
 
     const stream = client.messages.stream({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 2048,
         system: systemPrompt,
         messages: messages.map((m) => ({
@@ -184,7 +184,7 @@ export async function generatePreVisitSummary(
     const client = createAnthropicClient();
 
     const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 4096,
         system: `You are a clinical intake analyst. Given a patient intake conversation, extract all relevant information and generate a structured PRE-VISIT SUMMARY for the provider.
 

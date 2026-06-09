@@ -247,7 +247,7 @@ export async function generateClinicalDocument({
     const docTemplate = DOC_TYPE_INSTRUCTIONS[documentType] || '';
 
     const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 8192,
         system: `You are an expert medical documentation assistant for regenerative medicine and wellness practices. Generate precise, compliant clinical documentation.
 
@@ -299,7 +299,7 @@ export async function extractClinicalCodes(documentContent: string) {
     const client = createAnthropicClient();
 
     const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 2048,
         system: `You are a medical coding specialist. Extract all ICD-10 diagnosis codes and CPT procedure codes from the clinical document. Also extract key structured data.
 

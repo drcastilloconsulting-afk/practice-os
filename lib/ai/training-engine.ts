@@ -134,7 +134,7 @@ export async function generateTrainingScenario({
     const client = createAnthropicClient();
 
     const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 4096,
         system: `You are a medical training scenario designer for regenerative medicine practices. Create realistic, interactive training scenarios.
 
@@ -196,7 +196,7 @@ export async function generateQuiz({
     const client = createAnthropicClient();
 
     const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 4096,
         system: `You are a medical training quiz generator. Create accurate, challenging quiz questions for healthcare staff.
 
@@ -253,7 +253,7 @@ export async function streamTrainingRoleplay({
     const client = createAnthropicClient();
 
     const stream = client.messages.stream({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 2048,
         system: `You are a training simulator for regenerative medicine practices. You role-play as a PATIENT in a training scenario to help the staff member practice their skills.
 

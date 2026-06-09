@@ -129,7 +129,7 @@ export async function generateContent(request: ContentRequest): Promise<ContentP
     };
 
     const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 4096,
         system: `You are Dr. Castillo's marketing content creator for regenerative medicine practices.
 
@@ -206,7 +206,7 @@ export async function generateContentCalendar({
     const client = createAnthropicClient();
 
     const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 8192,
         system: `You are a medical marketing strategist for regenerative medicine practices.
 
@@ -278,7 +278,7 @@ export async function generateEmailCampaign({
     const client = createAnthropicClient();
 
     const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 8192,
         system: `You are a medical email marketing specialist.
 
@@ -331,7 +331,7 @@ export async function checkCompliance(content: string, platform: Platform): Prom
     const client = createAnthropicClient();
 
     const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 2048,
         system: `You are a medical advertising compliance reviewer. Check the content against FDA, FTC, and state medical board rules for regenerative medicine marketing.
 

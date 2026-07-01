@@ -6,8 +6,8 @@ import { spawn } from 'child_process';
 dotenv.config();
 
 const PORT = process.env.PORT || 8080;
-const NGROK_AUTHTOKEN = "3Dn6F2j7kxAgIVnKGjwzJpFi87n_3PWwdA5cBDRkLtUEBF2Sv";
-const STATIC_DOMAIN = "unnerving-reawake-starboard.ngrok-free.dev";
+const NGROK_AUTHTOKEN = process.env.NGROK_AUTHTOKEN;
+const STATIC_DOMAIN = process.env.NGROK_STATIC_DOMAIN;
 
 // Start the core Express server
 console.log('Starting voice-service server...');

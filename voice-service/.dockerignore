@@ -1,0 +1,13 @@
+node_modules
+.env
+.env.*
+*.log
+ngrok.log
+lt.log
+start_ngrok.js
+start_cloudflare.js
+start_pinggy.js
+start_and_update.js
+test_*.js
+.git
+.gitignore

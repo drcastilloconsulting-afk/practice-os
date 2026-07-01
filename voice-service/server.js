@@ -83,6 +83,49 @@ const TOOLS_DECLARATION = [
     }
 ];
 
+// ── Reconnect config ─────────────────────────────────────────────────────────
+const GEMINI_MAX_RETRIES = 5;
+const GEMINI_RETRY_BASE_MS = 1000; // exponential backoff starting point
+
+// ── Routes ───────────────────────────────────────────────────────────────────
+
+/**
+ * Health check — used by Railway and UptimeRobot to confirm the service is up.
+ */
+app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', service: 'PracticeOS Voice Concierge', timestamp: new Date().toISOString() });
+});
+
+/**
+ * Twilio Fallback URL — if /incoming-call errors, Twilio calls this instead.
+ * Returns friendly TwiML so the caller hears a human message rather than silence.
+ */
+app.get('/fallback', (_req, res) => {
+    const VoiceResponse = twilio.twiml.VoiceResponse;
+    const twiml = new VoiceResponse();
+    twiml.say(
+        { voice: 'Polly.Joanna', language: 'en-US' },
+        "Thank you for calling PracticeOS Regenerative Medicine. We're experiencing a brief technical issue. " +
+        "Please call us back in just a moment, or leave a message after the tone."
+    );
+    twiml.record({ maxLength: 60 });
+    res.type('text/xml');
+    res.send(twiml.toString());
+});
+
+app.post('/fallback', (_req, res) => {
+    const VoiceResponse = twilio.twiml.VoiceResponse;
+    const twiml = new VoiceResponse();
+    twiml.say(
+        { voice: 'Polly.Joanna', language: 'en-US' },
+        "Thank you for calling PracticeOS Regenerative Medicine. We're experiencing a brief technical issue. " +
+        "Please call us back in just a moment, or leave a message after the tone."
+    );
+    twiml.record({ maxLength: 60 });
+    res.type('text/xml');
+    res.send(twiml.toString());
+});
+
 /**
  * 1. Twilio Webhook (POST):
  * When a user calls your Twilio number, Twilio hits this endpoint.
@@ -110,20 +153,26 @@ app.post('/incoming-call', (req, res) => {
 app.ws('/stream', (twilioWs, req) => {
     let streamSid = null;
     let geminiWs = null;
+    let retryCount = 0;
+    let callActive = true; // false once Twilio disconnects
 
     console.log('[Twilio] New Connection established');
 
-    // 3. Connect to Gemini Multimodal Live API
-    const setupGeminiConnection = () => {
+    // ── Gemini connection factory with exponential backoff retry ─────────────
+    const setupGeminiConnection = (attempt = 0) => {
+        if (!callActive) return; // Don't reconnect if the call has already ended
+
         const HOST = "generativelanguage.googleapis.com";
         const MODEL = "models/gemini-2.5-flash-native-audio-latest";
         const URL = `wss://${HOST}/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
-        
+
+        console.log(`[Gemini] Connecting (attempt ${attempt + 1})...`);
         geminiWs = new WebSocket(URL);
 
         geminiWs.on('open', () => {
+            retryCount = 0; // reset on successful connection
             console.log('[Gemini] Connected to Live API');
-            
+
             // Send initial setup frame with System Instructions, Voice Config, and Tools
             const setupMessage = {
                 setup: {
@@ -136,7 +185,7 @@ app.ws('/stream', (twilioWs, req) => {
                         responseModalities: ["AUDIO"],
                         speechConfig: {
                             voiceConfig: {
-                                prebuiltVoiceConfig: { voiceName: "Kore" } // Warm, welcoming, younger female voice
+                                prebuiltVoiceConfig: { voiceName: "Kore" } // Warm, welcoming female voice
                             }
                         }
                     }
@@ -144,22 +193,21 @@ app.ws('/stream', (twilioWs, req) => {
             };
             geminiWs.send(JSON.stringify(setupMessage));
 
-            // Force Gemini to speak first by sending an initial prompt
-            // We use a 1.5s delay to ensure the Twilio WebRTC audio bridge is fully open 
-            // so the patient doesn't miss the first word of the greeting.
+            // Force Gemini to speak first — 1.5s delay ensures the Twilio WebRTC
+            // audio bridge is fully open so the patient doesn't miss the first word.
             setTimeout(() => {
                 const initialGreeting = {
                     clientContent: {
                         turns: [{
                             role: "user",
-                            parts: [{ 
-                                text: "The call has just connected. Please warmly greet the caller as the front desk concierge of PracticeOS Regenerative Medicine Clinic, and ask how you can help them today." 
+                            parts: [{
+                                text: "The call has just connected. Please warmly greet the caller as the front desk concierge of PracticeOS Regenerative Medicine Clinic, and ask how you can help them today."
                             }]
                         }],
                         turnComplete: true
                     }
                 };
-                if (geminiWs.readyState === WebSocket.OPEN) {
+                if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
                     geminiWs.send(JSON.stringify(initialGreeting));
                 }
             }, 1500);
@@ -173,17 +221,17 @@ app.ws('/stream', (twilioWs, req) => {
                 console.log('[Gemini] Non-JSON message received:', data);
                 return;
             }
-            
+
             // Check for explicit error from Gemini
             if (response.error) {
-                console.error('[Gemini] ERROR response:', response.error);
+                console.error('[Gemini] ERROR response:', JSON.stringify(response.error));
             }
 
             // Handle Server Content (Audio or Function Calls back from Gemini)
             if (response.serverContent?.modelTurn?.parts) {
                 const parts = response.serverContent.modelTurn.parts;
                 for (const part of parts) {
-                    
+
                     // 1. Audio Payload Handling
                     if (part.inlineData && part.inlineData.data) {
                         const base64Audio = part.inlineData.data;
@@ -203,7 +251,7 @@ app.ws('/stream', (twilioWs, req) => {
                         const base64Mulaw = Buffer.from(mulawBuffer).toString('base64');
 
                         // Send audio back to Twilio (must be wrapped in a 'media' event payload)
-                        if (streamSid) {
+                        if (streamSid && twilioWs.readyState === WebSocket.OPEN) {
                             const mediaMessage = {
                                 event: 'media',
                                 streamSid: streamSid,
@@ -224,16 +272,16 @@ app.ws('/stream', (twilioWs, req) => {
                     console.log(`\n[Gemini Tool Called] -> ${name}`);
                     console.log(`Arguments Provided:`, args);
 
+                    // Simulated tool responses — swap these for real API calls when ready
                     let simulatedResult = {};
                     if (name === "check_calendar") {
-                        simulatedResult = { status: "Success", slots_available: ["2:00 PM Tuesday", "9:00 AM Wed"], visit_total_price: 500, deposit_due: 250 };
+                        simulatedResult = { status: "Success", slots_available: ["2:00 PM Tuesday", "9:00 AM Wednesday"], visit_total_price: 500, deposit_due: 250 };
                     } else if (name === "save_intake_notes") {
                         simulatedResult = { status: "Profile Created", patient_id: "PT-777" };
                     } else if (name === "process_stripe_payment") {
                         simulatedResult = { status: "Payment Successful", receipt_id: "ch_xyz987" };
                     }
 
-                    // Send the result explicitly back to the model websocket
                     const functionResponsePayload = {
                         toolResponse: {
                             functionResponses: [{
@@ -243,7 +291,9 @@ app.ws('/stream', (twilioWs, req) => {
                             }]
                         }
                     };
-                    geminiWs.send(JSON.stringify(functionResponsePayload));
+                    if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
+                        geminiWs.send(JSON.stringify(functionResponsePayload));
+                    }
                 }
             }
         });
@@ -251,19 +301,31 @@ app.ws('/stream', (twilioWs, req) => {
         geminiWs.on('close', (code, reason) => {
             const msg = reason?.toString() || '(no reason)';
             console.log(`[Gemini] Connection closed. Code: ${code}, Reason: ${msg}`);
-            if (code !== 1000) {
+
+            // Unexpected disconnect — attempt reconnect with exponential backoff
+            if (code !== 1000 && code !== 1001 && callActive) {
                 console.error(`[Gemini] UNEXPECTED CLOSE — code ${code}: ${msg}`);
+                if (retryCount < GEMINI_MAX_RETRIES) {
+                    retryCount++;
+                    const delay = GEMINI_RETRY_BASE_MS * Math.pow(2, retryCount - 1);
+                    console.log(`[Gemini] Retrying in ${delay}ms (attempt ${retryCount}/${GEMINI_MAX_RETRIES})...`);
+                    setTimeout(() => setupGeminiConnection(retryCount), delay);
+                } else {
+                    console.error('[Gemini] Max retries reached. Closing Twilio stream.');
+                    callActive = false;
+                    if (twilioWs.readyState === WebSocket.OPEN) twilioWs.close();
+                }
             }
         });
-        
+
         geminiWs.on('error', (err) => {
-            console.error('[Gemini] Error:', err);
+            console.error('[Gemini] WebSocket error:', err.message);
         });
     };
 
     setupGeminiConnection();
 
-    // 4. Handle incoming messages from Twilio
+    // ── Handle incoming messages from Twilio ─────────────────────────────────
     twilioWs.on('message', (message) => {
         let msg;
         try {
@@ -282,17 +344,17 @@ app.ws('/stream', (twilioWs, req) => {
 
             // Decode Twilio's Base64 8kHz µ-law into Buffer
             const mulawBufferIn = Buffer.from(b64Audio, 'base64');
-            
+
             // Decode µ-law to PCM16 Int16Array
-            const pcmSamples = mulaw.decode(mulawBufferIn); 
-            
-            // Upsample from 8kHz to 16kHz by simply duplicating each sample
+            const pcmSamples = mulaw.decode(mulawBufferIn);
+
+            // Upsample from 8kHz to 16kHz by duplicating each sample
             const pcm16kHzSamples = new Int16Array(pcmSamples.length * 2);
             for (let i = 0; i < pcmSamples.length; i++) {
                 pcm16kHzSamples[i * 2] = pcmSamples[i];
-                pcm16kHzSamples[i * 2 + 1] = pcmSamples[i]; // duplicate
+                pcm16kHzSamples[i * 2 + 1] = pcmSamples[i];
             }
-            
+
             // Convert back to Base64 to send to Gemini
             const pcm16kHzBuffer = Buffer.from(pcm16kHzSamples.buffer, pcm16kHzSamples.byteOffset, pcm16kHzSamples.byteLength);
             const base64Pcm = pcm16kHzBuffer.toString('base64');
@@ -310,59 +372,31 @@ app.ws('/stream', (twilioWs, req) => {
             }
         } else if (msg.event === 'stop') {
             console.log(`[Twilio] Stream Stopped`);
-            if (geminiWs) geminiWs.close();
+            callActive = false;
+            if (geminiWs) geminiWs.close(1000, 'Call ended');
         }
     });
 
     twilioWs.on('error', (err) => {
-        console.error('[Twilio] WebSocket error occurred:', err);
+        console.error('[Twilio] WebSocket error occurred:', err.message);
+        callActive = false;
         if (geminiWs) geminiWs.close();
     });
 
     twilioWs.on('close', () => {
         console.log('[Twilio] Connection closed');
-        if (geminiWs) geminiWs.close();
+        callActive = false;
+        if (geminiWs) geminiWs.close(1000, 'Call ended');
     });
 });
 
-app.listen(PORT, async () => {
-    console.log(`🚀 PracticeOS Voice Microservice running on port ${PORT}`);
-    console.log(`Ensure your Twilio URL points to POST /incoming-call and WS /stream`);
-
-    // ── Gemini Live API health check ────────────────────────────────────────────
-    // Tests an actual WebSocket connection to the Live API (more reliable than
-    // querying the models list, which sometimes lags behind real availability).
-    try {
-        await new Promise((resolve, reject) => {
-            const testWs = new WebSocket(
-                `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`
-            );
-            const timeout = setTimeout(() => { testWs.terminate(); reject(new Error('timeout')); }, 8000);
-            testWs.on('open', () => {
-                testWs.send(JSON.stringify({
-                    setup: { model: 'models/gemini-2.5-flash-native-audio-latest', generationConfig: { responseModalities: ['AUDIO'] } }
-                }));
-            });
-            testWs.on('message', (data) => {
-                const msg = JSON.parse(data.toString());
-                if (msg.setupComplete !== undefined) {
-                    clearTimeout(timeout);
-                    testWs.close();
-                    resolve();
-                }
-            });
-            testWs.on('error', (e) => { clearTimeout(timeout); reject(e); });
-            testWs.on('close', (code, reason) => {
-                if (code !== 1000 && code !== 1001) {
-                    clearTimeout(timeout);
-                    reject(new Error(`WS closed ${code}: ${reason}`));
-                }
-            });
-        });
-        console.log('✅ Gemini Live API OK — model ready, WebSocket confirmed');
-    } catch (e) {
-        console.error('⚠️  WARNING: Gemini Live API health check failed:', e.message);
-        console.error('   Calls may fail. Check API key/quota at aistudio.google.com');
-    }
-
+// ── Start server ─────────────────────────────────────────────────────────────
+app.listen(PORT, () => {
+    console.log(`🚀 PracticeOS Voice Concierge running on port ${PORT}`);
+    console.log(`📞 POST /incoming-call  — Twilio webhook`);
+    console.log(`🌊 WS   /stream         — Twilio media stream`);
+    console.log(`❤️  GET  /health         — Health check`);
+    console.log(`🛟 GET  /fallback        — Twilio fallback TwiML`);
+    console.log(`\nEnsure TWILIO_PHONE_NUMBER webhook is set to POST /incoming-call`);
+    console.log(`Ensure TWILIO_PHONE_NUMBER fallback is set to POST /fallback`);
 });

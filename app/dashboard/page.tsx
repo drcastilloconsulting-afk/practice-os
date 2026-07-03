@@ -5,7 +5,7 @@ import {
   TrendingUp, TrendingDown, DollarSign, Users, Calendar, Bell,
   Mic, MessageSquare, Target, Star, BarChart3, Brain,
   ArrowUpRight, Clock, AlertTriangle, CheckCircle2, Activity,
-  ChevronRight, Zap, PhoneCall,
+  ChevronRight, Zap, PhoneCall, Trophy, Flame,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -149,6 +149,62 @@ export default function DashboardPage() {
           </motion.div>
         ))}
       </div>
+
+      {/* ── UA Squad Hero Banner ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Link
+          href="/dashboard/longevity"
+          className="group block relative overflow-hidden rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/80 via-violet-950/60 to-indigo-950/80 p-6 hover:border-indigo-400/50 transition-all duration-300"
+          style={{ boxShadow: '0 0 40px rgba(99,102,241,0.12)' }}
+        >
+          {/* Animated background glow */}
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/5 via-violet-600/10 to-indigo-600/5 pointer-events-none" />
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-1/3 w-48 h-48 bg-violet-500/8 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative flex items-center justify-between gap-6 flex-wrap">
+            {/* Left: branding + headline */}
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-glow flex-shrink-0">
+                <Trophy className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-display font-black text-lg text-white">UA Squad — Unfair Advantage Program</span>
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    LIVE
+                  </span>
+                </div>
+                <p className="text-sm text-[#94A3B8]">You are ranked <span className="text-indigo-300 font-bold">#5</span> in your cohort · <span className="text-emerald-400 font-semibold">+1.4% this week</span> · Top 2 win <span className="text-white font-semibold">$5,000 wellness package</span></p>
+              </div>
+            </div>
+
+            {/* Right: stats + CTA */}
+            <div className="flex items-center gap-6 flex-shrink-0">
+              <div className="hidden sm:flex items-center gap-6">
+                {[
+                  { icon: Flame, label: 'CNI Score', value: '94.6%', color: 'text-emerald-400' },
+                  { icon: Trophy, label: 'Cohort Rank', value: '#5 / 350', color: 'text-indigo-400' },
+                ].map(s => (
+                  <div key={s.label} className="text-center">
+                    <p className={`font-display font-black text-xl ${s.color}`}>{s.value}</p>
+                    <p className="text-[11px] text-[#64748B]">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 bg-indigo-600 group-hover:bg-indigo-500 transition-colors text-white text-sm font-bold px-5 py-2.5 rounded-xl shadow-glow">
+                Open Dashboard
+                <ArrowUpRight className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+        </Link>
+      </motion.div>
 
       {/* ── Main grid: chart + activity ── */}
       <div className="grid lg:grid-cols-3 gap-6">
